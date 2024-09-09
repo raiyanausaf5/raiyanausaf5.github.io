@@ -3,11 +3,12 @@ import skimage as sk
 import skimage.io as skio
 import matplotlib.pyplot as plt
 import os
+import skimage.filters as skf
+import skimage.transform as skt
 
-data_folder = '/Users/raiyanausaf14/Desktop/CS180/project1/data/'
-output_folder = '/Users/raiyanausaf14/Desktop/CS180/project1/output/'
+data_folder = './data'
+output_folder = './output'
 
-#different scoring functions
 def process_image(image_path):
     im = skio.imread(image_path)
     im = sk.img_as_float(im)
@@ -23,8 +24,8 @@ def process_image(image_path):
     r_normalized = normalize_brightness(r, b)
 
     # Find the best shifts after normalization using pyramid method
-    best_dx_g, best_dy_g = find_best_shift_pyramid(g_normalized, b, max_shift=30, pyramid_levels=4)
-    best_dx_r, best_dy_r = find_best_shift_pyramid(r_normalized, b, max_shift=30, pyramid_levels=4)
+    best_dx_g, best_dy_g = find_best_shift_pyramid(g_normalized, b, max_shift=15, pyramid_levels=4)
+    best_dx_r, best_dy_r = find_best_shift_pyramid(r_normalized, b, max_shift=15, pyramid_levels=4)
 
     # Align the channels
     aligned_g = np.roll(g_normalized, shift=(best_dy_g, best_dx_g), axis=(0, 1))
@@ -72,20 +73,26 @@ def normalize_brightness(channel, reference):
     
     return normalized_channel
 
-def gaussian_pyramid(image, levels):
+def gaussian_filter(image, sigma):
+    return skf.gaussian(image, sigma=sigma, mode='reflect')
+
+def resize_image(image, scale):
+    return skt.rescale(image, scale, mode='reflect', anti_aliasing=True)
+
+def gaussian_pyramid(image, levels, sigma):
     pyramid = [image]
     for i in range(1, levels):
-        image = sk.transform.pyramid_reduce(image, downscale=2)
+        image = gaussian_filter(image, sigma)
+        image = resize_image(image, 0.5)
         pyramid.append(image)
     return pyramid
 
+def find_best_shift_pyramid(channel, reference, max_shift=15, pyramid_levels=4, sigma=1):
+    channel_pyramid = gaussian_pyramid(channel, pyramid_levels, sigma)
+    reference_pyramid = gaussian_pyramid(reference, pyramid_levels, sigma)
 
-def find_best_shift_pyramid(channel, reference, max_shift=15, pyramid_levels=4):
-    channel_pyramid = gaussian_pyramid(channel, pyramid_levels)
-    reference_pyramid = gaussian_pyramid(reference, pyramid_levels)
-    
     best_dx, best_dy = 0, 0
-    
+
     for level in range(pyramid_levels - 1, -1, -1):
         best_dx *= 2
         best_dy *= 2
@@ -97,7 +104,7 @@ def find_best_shift_pyramid(channel, reference, max_shift=15, pyramid_levels=4):
         
         best_dx += dx
         best_dy += dy
-    
+
     return best_dx, best_dy
 
 def save_image(output_path, image):

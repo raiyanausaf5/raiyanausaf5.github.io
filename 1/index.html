@@ -3,66 +3,214 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Documentation</title>
+    <title>Image Processing Project</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 0;
+            line-height: 1.6;
+            margin: 20px;
             padding: 0;
             background-color: #f4f4f4;
         }
+        h1, h2 {
+            color: #333;
+        }
         .container {
             max-width: 900px;
-            margin: 20px auto;
+            margin: 0 auto;
             padding: 20px;
-            background-color: #fff;
+            background: #fff;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
-        h1 {
-            font-size: 2.5em;
-            color: #333;
+        .code-container {
+            background: #2e2e2e;
+            color: #f8f8f2;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto; /* Ensure horizontal scrolling */
+            white-space: nowrap; /* Prevent wrapping */
+            margin-bottom: 20px;
+            max-width: 100%; /* Adjust width to fit the container */
         }
-        h2 {
-            font-size: 2em;
-            color: #555;
-            margin-top: 20px;
-            border-bottom: 2px solid #eee;
-            padding-bottom: 10px;
-        }
-        p {
-            line-height: 1.6;
-            color: #666;
-        }
-        .name {
-            font-style: italic;
-            color: #888;
+        code {
+            display: block;
+            white-space: pre;
         }
         .section {
-            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        .section h2 {
+            margin-top: 0;
+        }
+        .image-container {
+            text-align: center; /* Center the image container */
+            margin: 20px 0; /* Add some margin around the images */
+        }
+        .image-container img {
+            max-width: 100%; /* Ensure image does not exceed the container width */
+            height: auto; /* Maintain aspect ratio */
+            width: 80%; /* Adjust width as needed to fit within the container */
+            max-height: 400px; /* Optional: set a max height if needed */
+            object-fit: cover; /* Optional: cover the container without distortion */
+            border: 1px solid #ddd; /* Optional: add a border for better visibility */
+            border-radius: 8px; /* Optional: round the corners of the image */
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1 class="biggest">Project Title</h1>
-        <h2>Subtitle: Name of the Project</h2>
-        <p class="name">Author: Your Name</p>
+        <h1>CS180 Project 1: Images of the Russian Empire</h1>
+        <h2>Overview</h2>
+        <p>Sergei Mikhailovich Prokudin-Gorskii (1863-1944) was a pioneering photographer who, 
+            in the early 20th century, utilized a unique color photography technique. 
+            He captured thousands of color photographs across the Russian Empire using a method that 
+            involved taking three separate exposures of each scene through red, green, and blue filters on glass plates. 
+            Despite his vision of projecting these images to educate Russian children, his plans were never realized, 
+            and he left Russia in 1918. Fortunately, his collection of RGB glass plate negatives survived and was later digitized 
+            by the Library of Congress (LoC), making them available online. The goal of this project is to process the digitized 
+            Prokudin-Gorskii glass plate images and reconstruct them into full-color photographs. 
+            This involves extracting and aligning the three color channel images (red, green, and blue) 
+            to produce a composite RGB image with minimal visual artifacts.</p>
+        
+        <h2>Implementation</h2>
+        <div class="section">
+            <h3>Imports and Paths</h3>
+            <div class="code-container">
+                <code>
+import numpy as np
+import skimage as sk
+import skimage.io as skio
+import matplotlib.pyplot as plt
+import os
 
-        <div class="section" id="overview">
-            <h2>Overview</h2>
-            <p>
-                <!-- Provide an overview of your project here. -->
-                This section provides a brief overview of the project, including its purpose, goals, and any important context.
+data_folder = '/Users/raiyanausaf14/Desktop/CS180/project1/data/'
+output_folder = '/Users/raiyanausaf14/Desktop/CS180/project1/output/'
+                </code>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Normalized Cross Correlation</h3>
+            <div class="code-container">
+                <code>
+def normalized_crosscorrelation(image1, image2):
+    norm1 = np.linalg.norm(image1, 'fro')
+    norm2 = np.linalg.norm(image2, 'fro')
+    image1 = image1 / norm1
+    image2 = image2 / norm2
+    return np.sum(image1 * image2)
+                </code>
+            </div>
+            <p>Used a Forbenius Norm, then normalized the respective matricies. Then returned the matrix dot product (elementwise).</p>
+        </div>
+
+        <div class="section">
+            <h3>Finding the Best Image Displacement</h3>
+            <div class="code-container">
+                <code>
+def find_best_shift(channel, reference, max_shift=15):
+    best_score = -float('inf')
+    best_dx = 0
+    best_dy = 0
+
+    for dx in range(-max_shift, max_shift + 1):
+        for dy in range(-max_shift, max_shift + 1):
+            shifted_channel = np.roll(channel, shift=(dy, dx), axis=(0, 1))
+            score = normalized_crosscorrelation(reference, shifted_channel)
+            
+            if score > best_score:
+                best_score = score
+                best_dx = dx
+                best_dy = dy
+
+    return best_dx, best_dy
+                </code>
+            </div>
+            <p>Used np.roll to make the shifts across the columns and rolls, and found the best score using the normalized cross correlation</p>
+        </div>
+        
+        <div class="section">
+            <h3>Brightness Problem</h3>
+            <div class="code-container">
+                <code>
+def normalize_brightness(channel, reference):
+    ref_mean = np.mean(reference)
+    ref_std = np.std(reference)
+
+    ch_mean = np.mean(channel)
+    ch_std = np.std(channel)
+
+    # Normalize the input channel to match the reference channel's mean and std
+    normalized_channel = (channel - ch_mean) * (ref_std / ch_std) + ref_mean
+
+    return normalized_channel
+                </code>
+            </div>
+            <p>The Normalized Cross Correlation was not an effective metric especially since the brightness was not the same on some pictures, 
+                to combat this by shifting the mean brightness and standard deviation to match that of the blue channel.
             </p>
         </div>
 
-        <div class="section" id="implementation">
-            <h2>Implementation</h2>
-            <p>
-                <!-- Describe the implementation details of your project here. -->
-                This section covers the implementation details, including the technologies used, the approach taken, and any significant challenges encountered.
+        <div class="section">
+            <h3>Image Pyramid</h3>
+            <div class="code-container">
+                <code>
+def gaussian_filter(image, sigma):
+    return skf.gaussian(image, sigma=sigma, mode='reflect')
+
+def resize_image(image, scale):
+    return skt.rescale(image, scale, mode='reflect', anti_aliasing=True)
+
+def gaussian_pyramid(image, levels, sigma):
+    pyramid = [image]
+    for i in range(1, levels):
+        image = gaussian_filter(image, sigma)
+        image = resize_image(image, 0.5)
+        pyramid.append(image)
+    return pyramid
+
+def find_best_shift_pyramid(channel, reference, max_shift=15, pyramid_levels=4, sigma=1):
+    channel_pyramid = gaussian_pyramid(channel, pyramid_levels, sigma)
+    reference_pyramid = gaussian_pyramid(reference, pyramid_levels, sigma)
+
+    best_dx, best_dy = 0, 0
+
+    for level in range(pyramid_levels - 1, -1, -1):
+        best_dx *= 2
+        best_dy *= 2
+        
+        channel_level = np.roll(channel_pyramid[level], shift=(best_dy, best_dx), axis=(0, 1))
+        reference_level = reference_pyramid[level]
+        
+        dx, dy = find_best_shift(channel_level, reference_level, max_shift=max_shift)
+        
+        best_dx += dx
+        best_dy += dy
+
+    return best_dx, best_dy
+                </code>
+            </div>
+            <p>Using an image pyramind helps us achieve the deseriable minute average per picture. We use the built in resizing and gaussian filter in skf, but
+                as mentioned in the project specifics, we implement the pyramid scheme from scratch. At each level we apply a gaussian filter and resize the shape by half.
+                By using the image pyramid, we leverage results of the smaller, downstreamed images to build back up. There is more code, but most of that is just bringing
+                all the functions together to process the function and save the results.
             </p>
+        </div>
+
+        <h2>Results</h2>
+        <p>Since I didn't do the B&W, the more complex images aren't as aligned (there is also some color enhancing that could be done). I did look into it a bit and found that edge detection could be something
+            very useful to help align the more complex images. However, most of the images came out to be really good!
+        </p>
+
+        <div class="section">
+            <h3>Image Gallery</h3>
+            <div class="image-container">
+                <img src="./output/aligned_lady.jpg" alt="Aligned Lady">
+                <img src="./output/aligned_melons.jpg" alt="Aligned Apple">
+                <img src="./output/aligned_sculpture.jpg" alt="Aligned Landscape">
+                <!-- Add more images as needed -->
+            </div>
         </div>
     </div>
 </body>
