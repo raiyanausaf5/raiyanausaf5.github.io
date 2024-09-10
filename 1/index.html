@@ -198,18 +198,111 @@ def find_best_shift_pyramid(channel, reference, max_shift=15, pyramid_levels=4, 
             </p>
         </div>
 
+        <div class="section"></div>
+            <h3>B&W Edge Detection</h3>
+            <div class="code-container">
+                <code>
+def process_image(image_path):
+    im = skio.imread(image_path)
+    im = sk.img_as_float(im)
+
+    # Divide the image into color channels
+    height = np.floor(im.shape[0] / 3.0).astype(int)
+    b = im[:height]
+    g = im[height: 2*height]
+    r = im[2*height: 3*height]
+
+    # Normalize brightness
+    g_normalized = normalize_brightness(g, b)
+    r_normalized = normalize_brightness(r, b)
+
+    # Apply edge detection
+    b_edges = detect_edges(b)
+    g_edges = detect_edges(g_normalized)
+    r_edges = detect_edges(r_normalized)
+
+    # Find the best shifts after normalization and edge detection using pyramid method
+    best_dx_g, best_dy_g = find_best_shift_pyramid(g_edges, b_edges, max_shift=15, pyramid_levels=4)
+    best_dx_r, best_dy_r = find_best_shift_pyramid(r_edges, b_edges, max_shift=15, pyramid_levels=4)
+
+    # Align the channels
+    aligned_g = np.roll(g_normalized, shift=(best_dy_g, best_dx_g), axis=(0, 1))
+    aligned_r = np.roll(r_normalized, shift=(best_dy_r, best_dx_r), axis=(0, 1))
+
+    # Stack the channels in RGB order (flip from BGR)
+    color_image = np.stack((aligned_r, aligned_g, b), axis=-1)
+
+    return color_image
+
+def detect_edges(image):
+    # Use Canny edge detection
+    edges = skfeat.canny(image, sigma=1)
+    return edges.astype(float)
+
+def find_best_shift_pyramid(channel, reference, max_shift=15, pyramid_levels=4, sigma=1):
+    channel_pyramid = gaussian_pyramid(channel, pyramid_levels, sigma)
+    reference_pyramid = gaussian_pyramid(reference, pyramid_levels, sigma)
+
+    best_dx, best_dy = 0, 0
+
+    for level in range(pyramid_levels - 1, -1, -1):
+        best_dx *= 2
+        best_dy *= 2
+        
+        channel_level = np.roll(channel_pyramid[level], shift=(best_dy, best_dx), axis=(0, 1))
+        reference_level = reference_pyramid[level]
+        
+        dx, dy = find_best_shift(channel_level, reference_level, max_shift=max_shift)
+        
+        best_dx += dx
+        best_dy += dy
+    print(best_dx, best_dy)
+    return best_dx, best_dy
+                </code>
+            </div>
+            <p>Some images such as the Emir one were really struggling to align, so for my B&W I decided to use edge detection to align them.
+                While the code is abstract, I did look at how it works at under the hood. A Canny Edge detection first starts off with a Gaussian Smoothing,
+                which allows us to reduce noise in the image (outliers that might be interpreted as edges). Then we use gradients of pixels relative to the neighboring
+                pixels to determine the edges as it tells us how sharp pixel color/brightness change, indicating an edge. The code is updated to perform the alignment relative to the edges with
+                still usign image pyramid scheme.
+            </p>
+
+
         <h2>Results</h2>
-        <p>Since I didn't do the B&W, the more complex images aren't as aligned (there is also some color enhancing that could be done). I did look into it a bit and found that edge detection could be something
-            very useful to help align the more complex images. However, most of the images came out to be really good!
+        <p> I have also attatched all the images with their corresponding best green filter shift (with respect to blue) and red filter shift (with respect to blue).
         </p>
 
         <div class="section">
             <h3>Image Gallery</h3>
             <div class="image-container">
-                <img src="./output/aligned_lady.jpg" alt="Aligned Lady">
-                <img src="./output/aligned_melons.jpg" alt="Aligned Apple">
-                <img src="./output/aligned_sculpture.jpg" alt="Aligned Landscape">
-                <!-- Add more images as needed -->
+                <img src="./output/aligned_emir.jpg">
+                <figcaption>(23, 49) Green & (40, 107) Red</figcaption>
+                <img src="./output/aligned_monastery.jpg">
+                <figcaption>(2, -3) Green & (2, 3) Red</figcaption>
+                <img src="./output/aligned_church.jpg">
+                <figcaption>(4, 25) Green & (-4, 58) Red</figcaption>
+                <img src="./output/aligned_three_generations.jpg">
+                <figcaption>(11, 56) Green & (7, 111) Red</figcaption>
+                <img src="./output/aligned_melons.jpg">
+                <figcaption>(9, 89) Green & (11, 182) Red</figcaption>
+                <img src="./output/aligned_onion_church.jpg">
+                <figcaption>(24, 52) Green & (34, 107) Red</figcaption>
+                <img src="./output/aligned_train.jpg">
+                <figcaption>(2, 48) Green & (29, 85) Red</figcaption>
+                <img src="./output/aligned_tobolsk.jpg">
+                <figcaption>(2, 3) Green & (3, 6) Red</figcaption>
+                <img src="./output/aligned_icon.jpg">
+                <figcaption>(16, 38) Green & (22, 90) Red</figcaption>
+                <img src="./output/aligned_cathedral.jpg">
+                <figcaption>(2, 5) Green & (3, 12) Red</figcaption>
+                <img src="./output/aligned_self_portrait.jpg">
+                <figcaption>(29, 77) Green & (37, 175) Red</figcaption>
+                <img src="./output/aligned_harvesters.jpg">
+                <figcaption>(18, 60) Green & (11, 117) Red</figcaption>
+                <img src="./output/aligned_sculpture.jpg">
+                <figcaption>(-11, 33) Green & (-27, 140) Red</figcaption>
+                <img src="./output/aligned_lady.jpg">
+                <figcaption>(10, 56) Green & (13, 120) Red</figcaption>
             </div>
         </div>
     </div>

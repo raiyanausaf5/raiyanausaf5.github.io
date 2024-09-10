@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import os
 import skimage.filters as skf
 import skimage.transform as skt
+import skimage.feature as skfeat
 
 data_folder = './data'
 output_folder = './output'
@@ -23,9 +24,14 @@ def process_image(image_path):
     g_normalized = normalize_brightness(g, b)
     r_normalized = normalize_brightness(r, b)
 
-    # Find the best shifts after normalization using pyramid method
-    best_dx_g, best_dy_g = find_best_shift_pyramid(g_normalized, b, max_shift=15, pyramid_levels=4)
-    best_dx_r, best_dy_r = find_best_shift_pyramid(r_normalized, b, max_shift=15, pyramid_levels=4)
+    # Apply edge detection
+    b_edges = detect_edges(b)
+    g_edges = detect_edges(g_normalized)
+    r_edges = detect_edges(r_normalized)
+
+    # Find the best shifts after normalization and edge detection using pyramid method
+    best_dx_g, best_dy_g = find_best_shift_pyramid(g_edges, b_edges, max_shift=15, pyramid_levels=4)
+    best_dx_r, best_dy_r = find_best_shift_pyramid(r_edges, b_edges, max_shift=15, pyramid_levels=4)
 
     # Align the channels
     aligned_g = np.roll(g_normalized, shift=(best_dy_g, best_dx_g), axis=(0, 1))
@@ -35,6 +41,11 @@ def process_image(image_path):
     color_image = np.stack((aligned_r, aligned_g, b), axis=-1)
     
     return color_image
+
+def detect_edges(image):
+    # Use Canny edge detection
+    edges = skfeat.canny(image, sigma=1)
+    return edges.astype(float)
 
 def normalized_crosscorrelation(image1, image2):
     norm1 = np.linalg.norm(image1, 'fro')
@@ -104,7 +115,7 @@ def find_best_shift_pyramid(channel, reference, max_shift=15, pyramid_levels=4, 
         
         best_dx += dx
         best_dy += dy
-
+    print(best_dx, best_dy)
     return best_dx, best_dy
 
 def save_image(output_path, image):
