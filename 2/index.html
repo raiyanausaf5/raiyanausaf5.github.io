@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.9/MathJax.js?config=TeX-MML-AM_CHTML" async></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Filters and Frequencies</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .code-container {
+            background: #2e2e2e;
+            color: #f8f8f2;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto; /* Ensure horizontal scrolling */
+            white-space: nowrap; /* Prevent wrapping */
+            margin-bottom: 20px;
+            max-width: 100%; /* Adjust width to fit the container */
+        }
+        code {
+            display: block;
+            white-space: pre;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section h2 {
+            margin-top: 0;
+        }
+        .image-container {
+            text-align: center; /* Center the image container */
+            margin: 20px 0; /* Add some margin around the images */
+        }
+        .image-container img {
+            max-width: 100%; /* Ensure the image fits within its container */
+            height: auto; /* Maintain aspect ratio */
+            object-fit: cover; /* Ensure the image covers the container without distortion */
+            border: 1px solid #ddd; /* Optional: add a border for better visibility */
+            border-radius: 8px; /* Optional: round the corners of the image */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CS180 Project 2: Fun with Filters and Frequencies!</h1>
+        <div class="section">
+            <h3>Part 1.1: Finite Difference Operator</h3>
+            <p>
+                The gradient across the X dimension is convoluted with the 2D matrix
+                [[1, -1]], which is this operation for each pixel:
+                \( \text{Gradient}_{x}(i,j) = I(i,j+1) - I(i,j) \).
+
+                The gradient across the Y dimension is convoluted with the 2D matrix [[1], [-1]], which is this operation for each pixel:
+                \( \text{Gradient}_{y}(i,j) = I(i+1,j) - I(i,j) \).
+
+                Doing a 2D Convolution with the image for each of the gradients gets us the following results:
+            </p>
+
+            <div class="image-container">
+                <img src="./supplemental/image1.1.1.png">
+                <img src="./supplemental/image1.1.2.png">
+            </div>
+        </div>
+
+        <div class="section"></div>
+            <h3>Part 1.2: Derivative of Gaussian Filter</h3>
+            <p>
+                To get a 2D Gaussian, we specify a kernel size of 5 with a standard deviation 1. We then do an outer product, to get a 5x5 Gaussian Filter. This Gaussian Filter
+                is used for convolution with the image
+            </p>
+
+            <div class="image-container">
+            </div>
+        </div>
+    </div>
+</body>
+</html>
