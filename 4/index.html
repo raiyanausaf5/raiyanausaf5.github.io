@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.9/MathJax.js?config=TeX-MML-AM_CHTML" async></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stitching Photo Mosaics</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .code-container {
+            background: #2e2e2e;
+            color: #f8f8f2;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto; /* Ensure horizontal scrolling */
+            white-space: nowrap; /* Prevent wrapping */
+            margin-bottom: 20px;
+            max-width: 100%; /* Adjust width to fit the container */
+        }
+        code {
+            display: block;
+            white-space: pre;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section h2 {
+            margin-top: 0;
+        }
+        .image-container img {
+            width: 50%; /* Adjust the percentage to make the images smaller */
+            height: auto; /* Maintain aspect ratio */
+            object-fit: cover; /* Ensure the image covers the container without distortion */
+            border: 1px solid #ddd; /* Optional: add a border for better visibility */
+            border-radius: 8px; /* Optional: round the corners of the image */
+        }
+        .image-container img {
+            width: 75%; /* Ensure the image fits within its container */
+            height: auto; /* Maintain aspect ratio */
+            object-fit: cover; /* Ensure the image covers the container without distortion */
+            border: 1px solid #ddd; /* Optional: add a border for better visibility */
+            border-radius: 8px; /* Optional: round the corners of the image */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CS180 Project 4a: Stitching Photo Mosaics</h1>
+        <div class="section">
+            <h2>Part 1: Recovering Homographies</h2>
+            <p> Homographies are used as transformation matricies to map points from one plane to another. We need to use homogenous coordinates to allow for more complex projections. You can use least-squares to 
+                solve for the homography, but I used SVD as it is a better way to avoid the case where H is near singular (making the SVD solution more robust than least-squares). The math is also shown below.
+            </p>
+            <p> The matrix-vector multiplication is:</p>
+
+            $$
+            \begin{pmatrix}
+            x' \\
+            y' \\
+            w'
+            \end{pmatrix}
+            =
+            \begin{pmatrix}
+            h_{11} & h_{12} & h_{13} \\
+            h_{21} & h_{22} & h_{23} \\
+            h_{31} & h_{32} & h_{33}
+            \end{pmatrix}
+            \begin{pmatrix}
+            x \\
+            y \\
+            1
+            \end{pmatrix}
+            =
+            \begin{pmatrix}
+            h_{11}x + h_{12}y + h_{13} \\
+            h_{21}x + h_{22}y + h_{23} \\
+            h_{31}x + h_{32}y + h_{33}
+            \end{pmatrix}
+            $$
+
+            <p>The resulting equations are:</p>
+
+            $$
+            x' = h_{11}x + h_{12}y + h_{13}
+            $$
+
+            $$
+            y' = h_{21}x + h_{22}y + h_{23}
+            $$
+
+            $$
+            w' = h_{31}x + h_{32}y + h_{33}
+            $$
+
+            <p>To convert back to Cartesian coordinates \( (x_c, y_c) \), divide by \( w' \):</p>
+
+            $$
+            x_c = \frac{x'}{w'} = \frac{h_{11}x + h_{12}y + h_{13}}{h_{31}x + h_{32}y + h_{33}}
+            $$
+
+            $$
+            y_c = \frac{y'}{w'} = \frac{h_{21}x + h_{22}y + h_{23}}{h_{31}x + h_{32}y + h_{33}}
+            $$
+        </div>
+        <div class="section">
+            <h2>Part 2: Warping</h2>
+            <p> For warping, I found the homography using the source and destination points defined by the correspondences, and I used that to warp the source points to the destination points. 
+                I used inverse warping and nearest-neighbor interpolation.
+        </div>
+
+        <div class="section">
+            <h2>Part 3: Rectification</h2>
+            <p> This part involves perspective changing the shape of a rectangular object in the input (which may be at an angle), and shifting it so that it appears like a flat rectangle in the output. I utilized
+                the correspondence tool from last time. Results are show below. 
+            </p>
+            <div class="image-container">
+                <img src="./supplemental/macRectified.png">
+                <img src="./supplemental/vlsbRectified.png">
+            </div>   
+        </div>
+        
+        <div class="section">
+            <h2>Part 4: Blending The Images Into a Mosaic</h2>
+            <p>     
+
+                In this two-image mosaic process, there are two main steps: image warping and alignment, followed by blending the images to remove visible seams.
+
+
+
+                To ensure that the combined images fit within the same frame, I created a larger canvas that is big enough to hold both warped_im1 and im2. 
+                This canvas accounts for any translation or displacement that occurs during the warping process, ensuring both images are positioned properly within the same coordinate space.
+            </p>
+            <p>
+                I created binary masks for both warped_im1 and im2. A binary mask is simply a black-and-white image where the white areas represent the visible portions of the image, and the black areas represent the background or unused space. 
+                To create these masks, I converted the images to grayscale and then applied a thresholding technique. Pixels above a certain threshold are set to 255 (white), while others are set to 0 (black). 
+                This process allows me to distinguish between the foreground (image content) and the background.
+                I computed distance transforms for each mask. A distance transform calculates, for each pixel, how far it is from the nearest boundary (edge of the image content). 
+                The result is a smooth gradient of values where pixels near the edges of the image content have a value close to 0 (since they are right at the boundary) and pixels further away from the edges, towards the center of the image content, have values closer to 1.
+            </p>
+            <p>
+                The next step was to calculate an alpha mask. If dist_mask2 is larger, the pixel will primarily be taken from im2. In areas where the images overlap, the alpha mask ensures a gradual blend by weighting the two images according to their relative distances from the edges.
+                I preserved the non-overlapping areas by directly copying the content from warped_im1 and im2 into the final canvas
+            </p>
+            $$
+            \alpha = \frac{{\text{{dist_mask1}}}}{{\text{{dist_mask1}} + \text{{dist_mask2}} + \epsilon}}
+            $$
+            <p>
+                These are the close ups of the panoramics.
+            </p>
+            <div class="image-container">
+                <img src="./supplemental/campus.png">
+                <img src="./supplemental/room1.png">
+                <img src="./supplemental/room2.png">
+            </div>   
+            <p>
+                These are the side by side of the source images + panoramics.
+            </p>
+            <div class="image-container">
+                <img src="./supplemental/campusSide.png">
+                <img src="./supplemental/room1Side.png">
+                <img src="./supplemental/room2Side.png">
+            </div>  
+        </div>
+    </div>
+</body>
+</html>
