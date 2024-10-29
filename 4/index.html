@@ -19,7 +19,7 @@
         }
         .container {
             max-width: 900px;
-            margin: 0 auto;
+            margin: 30px auto;
             padding: 20px;
             background: #fff;
             border-radius: 8px;
@@ -46,18 +46,24 @@
             margin-top: 0;
         }
         .image-container img {
-            width: 50%; /* Adjust the percentage to make the images smaller */
+            width: 100%; /* Adjust the percentage to make the images smaller */
             height: auto; /* Maintain aspect ratio */
             object-fit: cover; /* Ensure the image covers the container without distortion */
             border: 1px solid #ddd; /* Optional: add a border for better visibility */
             border-radius: 8px; /* Optional: round the corners of the image */
         }
         .image-container img {
-            width: 75%; /* Ensure the image fits within its container */
+            width: 100%; /* Ensure the image fits within its container */
             height: auto; /* Maintain aspect ratio */
             object-fit: cover; /* Ensure the image covers the container without distortion */
             border: 1px solid #ddd; /* Optional: add a border for better visibility */
             border-radius: 8px; /* Optional: round the corners of the image */
+        }
+        .container img {
+            display: inline-block; /* Allow images to sit next to each other */
+            max-width: 100%; /* Responsive */
+            height: auto; /* Maintain aspect ratio */
+            margin: 0 10px; /* Spacing between images */
         }
     </style>
 </head>
@@ -175,10 +181,125 @@
             </p>
             <div class="image-container">
                 <img src="./supplemental/campusSide.png">
-                <img src="./supplemental/room1side.png">
-                <img src="./supplemental/room2side.png">
+                <img src="./supplemental/room1Side.png">
+                <img src="./supplemental/room2Side.png">
             </div>  
         </div>
     </div>
 </body>
+<div class="container">
+    <h1>CS180 Project 4b: Feature Matching For Autostitching</h1>
+    <div class="section">
+        <h2>Part 1: Harris Corners</h2>
+        <p>The Harris Corner Detection algorithm starts by computing the image gradients in the horizontal and vertical directions. These gradients capture how pixel intensities change in the x and y directions.</p>
+
+        <p>Next, a second moment matrix (also known as the structure tensor) is built over a small window around each pixel. This matrix summarizes the changes in intensity based on the gradients and describes how much variation occurs in different directions.</p>
+
+        <ul>
+            <li><b>Corners:</b> If the pixel is at a corner, both eigenvalues of the matrix will be large, as the intensity changes significantly in multiple directions.</li>
+            <li><b>Edges:</b> For an edge, the intensity changes significantly in one direction but not the other, so one eigenvalue will be large, while the other will be close to 0.</li>
+            <li><b>Flat Regions:</b> In flat areas, both eigenvalues will be small, as there is little to no variation in intensity.</li>
+        </ul>
+
+        <p>The Harris Response score \( R \) is calculated using the eigenvalues of the second moment matrix. A common formulation is:</p>
+
+        <p>
+        \[
+        R = \frac{\text{det}(M)}{\text{trace}(M)} = \frac{\lambda_1 \lambda_2}{\lambda_1 + \lambda_2}
+        \]
+        </p>
+
+        <p>This score does a good job of distinguishing corners (where both eigenvalues are large) from edges (where one eigenvalue is large and the other is small) and flat regions (where both eigenvalues are small).
+           I used the code provided in the project description with the addition of filtering through the response values to choose the best 1000 points.
+        </p>
+        <div class="image-container">
+            <img src="./supplemental/harrisCorners1.png">
+            <img src="./supplemental/harrisCorners2.png">
+        </div>  
+    </div>
+    <div class="section">
+        <h2>Part 2: Adaptive Non-Maximal Suppression</h2>
+        <p>
+            $$r_i = \min_j |\mathbf{x}_i - \mathbf{x}_j|, \text{ s.t. } f(\mathbf{x}_i) < c_{\text{robust}}f(\mathbf{x}_j), \mathbf{x}_j \in \mathcal{I}$$
+        </p>
+        <p>
+            Adaptive Non-Maximal Suppression (ANMS) selects a subset of points while using a criterion that determines which points are considered "locally" better.
+            A stronger point in the paper presented is considered a point j (relative to point i) is such that the following equation holds true: f(j) > c_robust * f(i)
+        </p>
+        <p>
+            I looped through each point and found all the ecludian distances between the current point i and all the other points. I then created a boolean array indetifying, which 
+            tells us what points are stronger than point i. I found the minimum distance to the nearest stronger point, and used that value to determine the strongest 100 points. A higher minimum distance
+            means that this is a very locally strong point relative to its neighbors, while a low minimum distance menas that this point is locally very weak relative to its neighbors. Using this, we find sort
+            by the minimum distances, selecting the points associated with the largest minimum distances.
+        </p>
+        <div class="image-container">
+            <img src="./supplemental/adaptive1.png">
+            <img src="./supplemental/adaptive2.png">
+        </div> 
+    </div>
+    <div class="section">
+        <h2>Part 3: Feature Descriptor</h2>
+        <p>
+            A feature descriptor is a concise representation of the local information around a feature point in an image.
+            It captures essential visual characteristics of the area surrounding the feature point that is invariant to different changes like constrast, rotation, and lighting (which is why it's useful for our specific task).
+            To create a feature descriptor for a feature point, a small region of the image around this point (a patch) is extracted. In this case, we extract a 40x40 pixel window around the feature point.
+            The next step is to downsample this window to an 8x8 because a smaller patch will reduce sensitivity to noise and small variations while still capturing the overall pattern in the region of interest. 
+            The way we do this is (after doing a gaussian blur of the 40x40 region) we take every 5th pixel to fill the 8x8 patch.
+            We also normalize this resized patch to remove the effects of any changes in lighting or contrast. The way we do this is through bias noramlization which is just subtracting the mean pixel value from each pixel in the patch
+            to adjust for any brightness differences. Then we do gain normalization which is dividing by the norm of the patch to scale the pixels correctly regardless of any contrast differences. The result for one corner point selected after ANMS is shown.
+        </p>
+        <div class="image-container">
+            <img src="./supplemental/descriptor.png">
+        </div> 
+    </div>
+    <div class="section">
+        <h2>Part 4: Feature Matching</h2>
+        <p>
+            We create feature descriptors for each feature point in each image. For each descriptor in the first image, we compute the Euclidean distance between that discreptor and all descriptors in the second image.
+            We find the closest and the second closest descriptors from the second image. A match is considered valid if the ratio of the closest distance / second closest distance is under a ratio threshold. The idea is that the closest match should be significantly closer
+            than the second-closest match, which helps filter out poor feature matches. The result is shown below.
+        </p>
+        <div class="image-container">
+            <img src="./supplemental/matching.png">
+        </div> 
+    </div>
+    <div class="section">
+        <h2>Part 5: RANSAC</h2>
+            <p>
+            Despite Lowe's ratio test filtering out many outliers, some incorrect feature pairs still remain. If we were to use a least-squares method, it wouldn’t be robust to these outliers—just one bad feature match could skew the homography result significantly.
+            This is where RANSAC (Random Sample Consensus) becomes valuable. RANSAC allows us to handle outliers by iteratively sampling a small set of points. We repeatedly select four random point pairs and compute the homography using only these pairs. Then, we determine the number of inliers for the homography.
+            After many iterations, we select the homography with the most inliers, which represents the best alignment while ignoring outliers.
+            </p>
+            <p>
+            For my specific implementation, I split it up into three functions. The first function is called compute_homography, and it computes the homography using SVD given a set of source and destination points. If we set the last element of the last row of H to be 1 (to ensure we have unique homography since you can scale the matrix to get infinitely many solutions),
+            then you have 8 unknowns, meaning a minimum of 4 points is required (since each point has a corresponding equation for the x and y coordinate).
+            </p>
+            <p>
+            The second function is called compute_homography_error. This is used to determine if any given corresponding point is an inlier or not. It averages the forward error (dist(H*p1, p2)) and the backward error dist((H_inverse *p2, p1)) as the result.
+            </p>
+            <p>
+                The main pipeline of the RANSAC is in the ransac_homography function. This is where the main logic of updating the best homography (the one with the most inliers) is done and stored. The best homography is returned. This function can be turned for the error threshold and number of iterations. I used 2000 for the number of iterations with error_threshold of 5 pixels.
+                I copied my code from part a of the project to do the same exact blending and stitching of images. The results are shown below side by side. The left side is results from part A, and the right side are the results from autostitching.
+            </p>
+            <div style="display: flex; justify-content: center; align-items: center; gap: 20px;">
+                <img src="./supplemental/campus.png" style="width: 45%; max-width: 500px;">
+                <img src="./supplemental/res1.png" style="width: 45%; max-width: 500px;">
+            </div>
+            <div style="display: flex; justify-content: center; align-items: center; gap: 20px;">
+                <img src="./supplemental/room1.png" style="width: 45%; max-width: 500px;">
+                <img src="./supplemental/res2.png" style="width: 45%; max-width: 500px;">
+            </div>
+            <div style="display: flex; justify-content: center; align-items: center; gap: 20px;">
+                <img src="./supplemental/room2.png" style="width: 45%; max-width: 500px;">
+                <img src="./supplemental/res3.png" style="width: 45%; max-width: 500px;">
+            </div>
+        
+    </div>
+    <div class="section">
+        <h2>Favorite Thing</h2>
+        <p>
+            The coolest thing about the project was automating the feature matching and stitching because I ended up getting less blurry results since my manual feature matching wouldn't be exact (human error).
+        </p>
+    </div>
+</div>
 </html>
