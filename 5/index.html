@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.9/MathJax.js?config=TeX-MML-AM_CHTML" async></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diffusion Models</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .code-container {
+            background: #2e2e2e;
+            color: #f8f8f2;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: nowrap;
+            margin-bottom: 20px;
+            max-width: 100%;
+        }
+        code {
+            display: block;
+            white-space: pre;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section h2 {
+            margin-top: 0;
+        }
+        .image-gallery {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+        .image-container {
+            text-align: center;
+            flex-basis: calc(33.333% - 20px);
+            min-width: 200px;
+        }
+        .image-container img {
+            width: 100%;
+            height: auto;
+            object-fit: cover;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+        .caption {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CS180 Project 5a: The Power of Diffusion Models</h1>
+        <div class="section">
+            <h2>Part 1: Implementing the Forward Process</h2>
+            <p>The forward process takes a clean image and adds noise to it. This is equivalent to the following: </p>
+            <p>$$x_t = \sqrt{\bar{\alpha}_t} x_0 + \sqrt{1 - \bar{\alpha}_t} \, \epsilon$$</p>
+            <p>where \( \epsilon \sim N(0, 1) \). The first square root term scales the clean image and it decreases over time as t increases, meaning the resultant image is more noisy for larger t.
+               The second term adds gaussian noise to the image. Epsilon needs to be the same size as the original image, and each pixel is independently sampled from a normal distribution.
+            </p>
+            <div class="image-gallery">
+                <div class="image-container">
+                    <img src="./supplemental/250noise.png">
+                    <div class="caption">Low noise level (t=250)</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/500noise.png">
+                    <div class="caption">Medium noise level (t=500)</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/750noise.png">
+                    <div class="caption">High noise level (t=750)</div>
+                </div>
+            </div>   
+        </div>
+        <div class="section">
+            <h2>Part 2: Classical Denoising</h2>
+            <p>Gaussian Blurring removes high-frequeuncy compents (which noise usually is) by smoothing out the image with neighboring pixels getting larger weight. 
+               I used a sigma value of 1.5 with kernel size of 5. The results are below, but we see this isn't effective because gaussian blur is just a weighted average at a high level.
+               This means when your image is more noisy, doing weighted averages will still have a lot of noise since there's less and less of the original image.</p>
+
+            <div class="image-gallery">
+                <div class="image-container">
+                    <img src="./supplemental/250noise.png">
+                    <div class="caption">Low noise level (t=250)</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/gauss250.png">
+                    <div class="caption">Low noise level (t=250) Gaussian Blur</div>
+                </div>
+            </div>   
+
+            <div class="image-gallery">
+                <div class="image-container">
+                    <img src="./supplemental/500noise.png">
+                    <div class="caption">Medium noise level (t=500)</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/gauss500.png">
+                    <div class="caption">Medium noise level (t=500) Gaussian Blur</div>
+                </div>
+            </div>   
+               
+            <div class="image-gallery">
+                <div class="image-container">
+                    <img src="./supplemental/750noise.png">
+                    <div class="caption">High noise level (t=750)</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/gauss750.png">
+                    <div class="caption">High noise level (t=750) Gaussian Blur</div>
+                </div>
+            </div>   
+
+        </div>
+        <div class="section">
+            <h2>Part 3: Implementing One Step Denoising</h2>
+            <p>We can rearrange the equation in part 1 to estimate the original image (assuming we know what the noise is).</p>
+            <p>$$x_0 = \frac{1}{\sqrt{\bar{\alpha}_t}} x_t - \frac{\sqrt{1 - \bar{\alpha}_t}}{\sqrt{\bar{\alpha}_t}} \, \epsilon$$</p>
+            <p>We can use a pre-trained diffusion model to get the noise estimate, and using the image above we can obtain an estimate to the original image. The results are shown below.</p>
+
+            <div class="image-gallery">
+                <div class="image-container">
+                    <img src="./supplemental/250noise.png">
+                    <div class="caption">Low noise level (t=250)</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/pre250.png">
+                    <div class="caption">(t=250) estimate</div>
+                </div>
+            </div>   
+
+            <div class="image-gallery">
+                <div class="image-container">
+                    <img src="./supplemental/500noise.png">
+                    <div class="caption">Medium noise level (t=500)</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/pre500.png">
+                    <div class="caption">(t=500) estimate</div>
+                </div>
+            </div>   
+               
+            <div class="image-gallery">
+                <div class="image-container">
+                    <img src="./supplemental/750noise.png">
+                    <div class="caption">High noise level (t=750)</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/pre750.png">
+                    <div class="caption">(t=750) estimate</div>
+                </div>
+            </div> 
+
+        </div>
+        <div class="section">
+            <h2>Part 4: Iterative Denoising</h2>
+            <p>From the previous part, we see that the diffusion model predicting the noise and us solving for the original image does a much better job of projecting the noisy image on the natural 
+               image manifold. However, it clearly does worse as we add more noise. We can solve this problem iteratively by breaking it down into smaller problems. This means we start from the original noisy image
+               then we make the result progressively less noisy. We can do this in steps of 30 to be less expensive relative to using a step size of 1.
+            </p>
+
+            <p>
+                \[x_{t'} = \frac{\sqrt{\alpha_t\beta_t}}{1-\bar{\alpha}_t}x_0 + \frac{\sqrt{\alpha_t(1-\bar{\alpha}_{t'})}}{1-\bar{\alpha}_t}x_t + v_\sigma\]
+            </p>
+
+            <p>Here's the results in each 5th iteration of the denoising loop with the ones being earlier in the denoising loop.</p>
+            <div class="image-gallery">
+                <div class="image-container">
+                    <img src="./supplemental/iter1.png">
+                    <div class="caption">First 5th iteration</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/iter2.png">
+                    <div class="caption">Second 5th iteration</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/iter3.png">
+                    <div class="caption">Third 5th iteration</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/iter4.png">
+                    <div class="caption">Fourth 5th iteration</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/iter5.png">
+                    <div class="caption">Fifth 5th iteration</div>
+                </div>
+            </div> 
+
+            <p>Here are the results for the one-step denoising, gaussian denoising, and final result for the iterative denoising</p>
+            <div class="image-gallery">
+                <div class="image-container">
+                    <img src="./supplemental/onestep.png">
+                    <div class="caption">One Step</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/gauss.png">
+                    <div class="caption">Gaussian</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/iter.png">
+                    <div class="caption">Iterative</div>
+                </div>
+            </div> 
+        </div>
+
+        <div class="section">
+            <h2>Part 5: Diffusion Model Sampling</h2>
+            <p>If we start from i_start = 0 and pass in random noise, we can denoise pure noise using the iterative_denoise function made from before. Here are the results.
+               As we can see it's hard to tell what some images even are (like the 2nd and 3rd). Despite this being a 64x64 image (so the resolution is not that great), we should still be able to tell what the image is.
+            </p>
+            <div class="image-gallery">
+                <div class="image-container">
+                    <img src="./supplemental/random1.png">
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/random2.png">
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/random3.png">
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/random4.png">
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/random5.png">
+                </div>
+            </div> 
+        </div>
+
+        <div class="section">
+            <h2>Part 6: Classifier-Free Guidance (CFG)</h2>
+            <p>
+                \[\epsilon = \epsilon_u + \gamma(\epsilon_c - \epsilon_u)\]
+            </p>
+            
+            <p>When estimating the noise, a higher lambda will result in a noise more closely following the conditional noise (meaning the resultant image is closer to the conditional text prompt). This helps
+               the diffusion model generate images that are of higher quality (following the text prompt). The results are below.
+            </p>
+            <div class="image-gallery">
+                <div class="image-container">
+                    <img src="./supplemental/cfg1.png">
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/cfg2.png">
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/cfg3.png">
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/cfg4.png">
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/cfg5.png">
+                </div>
+            </div> 
+        </div>
+
+        <div class="section">
+            <h2>Part 7:  Image-to-image Translation</h2>
+            <p>When we add more noise to the original image, we force the model to hallucinate new things so the denoising process will result in different image (since new things were hallucinated).
+               We can see the results of the different i_start values with higher i_start meaning less noise. I also added an i_start of 30 for good measure.
+            </p>
+            <div class="image-gallery">
+                <div class="image-container">
+                    <img src="./supplemental/imT1.png">
+                    <div class="caption">i_start=1</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/imT2.png">
+                    <div class="caption">i_start=3</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/imT3.png">
+                    <div class="caption">i_start=5</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/imT4.png">
+                    <div class="caption">i_start=7</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/imT5.png">
+                    <div class="caption">i_start=10</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/imT6.png">
+                    <div class="caption">i_start=20</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/imT7.png">
+                    <div class="caption">i_start=30</div>
+                </div>
+            </div> 
+        </div>
+
+        <div class="section">
+            <h2>Part 7.1: Editing Hand-Drawn and Web Images</h2>
+            <p>We run the same code as the last part just on 1 image from the web and 2 scribbles. All three images are non-realistic and should have better results.</p>
+            <div class="image-gallery">
+                <div class="image-container">
+                    <img src="./supplemental/avo1.png">
+                    <div class="caption">i_start=1</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/avo2.png">
+                    <div class="caption">i_start=3</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/avo3.png">
+                    <div class="caption">i_start=5</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/avo4.png">
+                    <div class="caption">i_start=7</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/avo5.png">
+                    <div class="caption">i_start=10</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/avo6.png">
+                    <div class="caption">i_start=20</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/avo7.png">
+                    <div class="caption">i_start=30</div>
+                </div>
+            </div> 
+
+            <p>Here is our results for our first scribble of a house</p>
+
+            <div class="image-gallery">
+                <div class="image-container">
+                    <img src="./supplemental/houseSc.png">
+                    <div class="caption">The Drawing</div>
+                </div> 
+            <div>
+
+            <div class="image-gallery">
+                <div class="image-container">
+                    <img src="./supplemental/house1.png">
+                    <div class="caption">i_start=1</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/house2.png">
+                    <div class="caption">i_start=3</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/house3.png">
+                    <div class="caption">i_start=5</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/house4.png">
+                    <div class="caption">i_start=7</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/house5.png">
+                    <div class="caption">i_start=12</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/house6.png">
+                    <div class="caption">i_start=15</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/house7.png">
+                    <div class="caption">i_start=17</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/house8.png">
+                    <div class="caption">i_start=20</div>
+                </div>
+            </div> 
+            
+            <p>Here is our results for our second scribble of a tree and a sun.</p>
+
+            <div class="image-gallery">
+                <div class="image-container">
+                    <img src="./supplemental/tree.png">
+                    <div class="caption">The Drawing</div>
+                </div> 
+            <div>
+
+            <div class="image-gallery">
+                <div class="image-container">
+                    <img src="./supplemental/tree1.png">
+                    <div class="caption">i_start=1</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/tree2.png">
+                    <div class="caption">i_start=3</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/tree3.png">
+                    <div class="caption">i_start=5</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/tree4.png">
+                    <div class="caption">i_start=7</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/tree5.png">
+                    <div class="caption">i_start=12</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/tree6.png">
+                    <div class="caption">i_start=15</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/tree7.png">
+                    <div class="caption">i_start=17</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/tree8.png">
+                    <div class="caption">i_start=20</div>
+                </div>
+                <div class="image-container">
+                    <img src="./supplemental/tree9.png">
+                    <div class="caption">i_start=30</div>
+                </div>
+            </div> 
+            </div>
+
+            <div class="section">
+                <h2>Part 7.2: Impainting</h2>
+                <div style="font-size: 1.2em; margin: 20px;">
+                    $$x_t \leftarrow \mathbf{m}x_t + (1-\mathbf{m})\text{forward}(x_{orig}, t)$$
+                </div>
+            
+                <p>Using the formula above in each iteration of denoising, we can force certain pixels to be the same as xorigin through masking. Here are some masks and results.</p>
+            
+                <div class="image-gallery">
+                    <div class="image-container">
+                        <img src="./supplemental/mask1.png">
+                        <div class="caption">Mask 1</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/res1.png">
+                        <div class="caption">Result</div>
+                    </div> 
+                </div>
+            
+                <div class="image-gallery">
+                    <div class="image-container">
+                        <img src="./supplemental/mask2.png">
+                        <div class="caption">Mask 2</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/res2.png">
+                        <div class="caption">Result</div>
+                    </div> 
+                </div>
+            
+                <div class="image-gallery">
+                    <div class="image-container">
+                        <img src="./supplemental/mask3.png">
+                        <div class="caption">Mask 3</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/res3.png">
+                        <div class="caption">Result</div>
+                    </div> 
+                </div>
+            </div>
+            </div>
+
+            <div class="section">
+                <h2>Part 7.3: Text-Conditional Image-to-Image Translation</h2>
+                <p>We now change the prompt to guide the resultant image projection with text.</p>
+                <p>For our first text prompt: "a rocket ship" with a rectangular mask covering the whole campanile.</p>
+                <div class="image-gallery">
+                    <div class="image-container">
+                        <img src="./supplemental/rocket1.png">
+                        <div class="caption">Noise level 1</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/rocket2.png">
+                        <div class="caption">Noise level 3</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/rocket3.png">
+                        <div class="caption">Noise level 5</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/rocket4.png">
+                        <div class="caption">Noise level 7</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/rocket5.png">
+                        <div class="caption">Noise level 10</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/rocket6.png">
+                        <div class="caption">Noise level 20</div>
+                    </div>
+                </div>
+
+                <p>For our second text prompt: "a pencil" with a rectangular mask covering the whole campanile.</p>
+                <div class="image-gallery">
+                    <div class="image-container">
+                        <img src="./supplemental/pen1.png">
+                        <div class="caption">Noise level 1</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/pen2.png">
+                        <div class="caption">Noise level 3</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/pen3.png">
+                        <div class="caption">Noise level 5</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/pen4.png">
+                        <div class="caption">Noise level 7</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/pen5.png">
+                        <div class="caption">Noise level 10</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/pen6.png">
+                        <div class="caption">Noise level 20</div>
+                    </div>
+                </div>
+
+                <p>For our third text prompt: "a rocket ship" but this time just a mask on the bottom half of the campnanile.</p>
+                <div class="image-gallery">
+                    <div class="image-container">
+                        <img src="./supplemental/rocH1.png">
+                        <div class="caption">Noise level 1</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/rocH2.png">
+                        <div class="caption">Noise level 3</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/rocH3.png">
+                        <div class="caption">Noise level 5</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/rocH4.png">
+                        <div class="caption">Noise level 7</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/rocH5.png">
+                        <div class="caption">Noise level 10</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/rocH6.png">
+                        <div class="caption">Noise level 20</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Part 8: Visual Anagrams</h2>
+                <p>Our goal is to create a single image that looks like one thing in its normal orientation and another thing when flipped.
+                   This requires two prompts (one for each orientation). The key idea is we are trying to force each orientation to like each prompt.
+                   We already know how to do this normally through iterative denoising. Inside each iterative denoising loop, we need to also calculate the noise
+                   in the flipped direction. We need to average the two noises along with the variances. A key part is to flip the noise of the other orientations.
+                   This is because we add the noise back in the normal orientation.</p>
+                <div class="image-gallery">
+                    <div class="image-container">
+                        <img src="./supplemental/oldman.png">
+                        <div class="caption">An Oil Painting of an Old Man</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/camp1.png">
+                        <div class="caption">An Oil Painting of People around a Campfire (flipped)</div>
+                    </div>
+                </div>
+                <div class="image-gallery">
+                    <div class="image-container">
+                        <img src="./supplemental/man.png">
+                        <div class="caption">A man</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/dog.png">
+                        <div class="caption">A dog (flipped)</div>
+                    </div>
+                </div>
+                <div class="image-gallery">
+                    <div class="image-container">
+                        <img src="./supplemental/mountains.png">
+                        <div class="caption">An oil painting of a snowy mountain village</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/camp2.png">
+                        <div class="caption">An Oil Painting of People around a Campfire (flipped)</div>
+                    </div>
+                </div>
+                </div>
+
+                <div class="section">
+                    <h2>Part 9: Hybrid Images</h2>
+                    <p>In order to create hybrid images, we need to get to do a lowpass filter and get the low frequency noise estimate of one image and the high frequency noise estimate of another image. We combine these values
+                        to get a new hybrid noise estimate. We can implement the low frequency and high frequency noise estimates using the gaussian filter. Here are some results.
+                    </p>
+                    <div class="image-gallery">
+                        <div class="image-container">
+                            <img src="./supplemental/hybrid1.png">
+                            <div class="caption">Skull from afar and waterfall up close.</div>
+                        </div> 
+                        <div class="image-container">
+                            <img src="./supplemental/hybrid2.png">
+                            <div class="caption">Oil painting of snowy village from afar and an oil painting of a man up close.</div>
+                        </div>
+                        <div class="image-container">
+                            <img src="./supplemental/hybrid3.png">
+                            <div class="caption">Oil painting of people around a campfire from afar and an oil painting of a man up close.</div>
+                        </div>
+                    </div>
+                    </div>
+            </div>
+        </div>
+        </div>
+        </div>
+        <div class="container">
+            <h1>CS180 Project 5b: Diffusion Models from Scratch</h1>
+            <div class="section">
+                <h2>Part 1: Training a Single-Step Denoising UNet</h2>
+                <p>The first part is correctly producing code for the different blocks of the Unconditional UNet.</p>
+                <ol>
+                    <li>Conv: 3x3 convolution with padding=1 and stride=1 + Batch Normalization + GELU</li>
+                    <li>Down Conv: 3x3 convolution with padding=1 and stride=2 + Batch Normalization + GELU</li>
+                    <li>Up Conv: 4x4 inverse convolution (upscaling) with padding=1 and stride=2 + Batch Normalization + GELU</li>
+                    <li>Flatten: 7x7 average pooling + GELU</li>
+                    <li>Unflatten: 7x7 inverse convolution (upscaling) + Batch Noramlization + GELU</li>
+                    <li>Concat: Channel wise concatenation</li>
+                    <li>ConvBlock, DownBlock, UpBlock: All combinations of the single operations above</li>
+                  </ol>
+                <p>The decoder downsamples the images to increase the receptive field to help identify patterns and strcutral information in the noisy image. Then we can upsample the image back to its original resolution using skip connections to connect corresponding levels between the downsampling and upsampling paths.
+                    This helps preserve the details that might have been lost during downsampling.
+                </p>
+                <p>To add noise to the original images we can use the following formula: $$z = x + \sigma\epsilon, \quad \text{where } \epsilon \sim \mathcal{N}(0,I).$$</p>
+                <p>We can visualize the process of adding gaussian noise below for different images.</p>
+                <div class="image-gallery">
+                    <div class="image-container">
+                        <img src="./supplemental/01.png">
+                        <div class="caption">sigma=0</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/02.png">
+                        <div class="caption">sigma=0.2</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/03.png">
+                        <div class="caption">sigma=0.4</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/04.png">
+                        <div class="caption">sigma=0.5</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/05.png">
+                        <div class="caption">sigma=0.6</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/06.png">
+                        <div class="caption">sigma=0.8</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/07.png">
+                        <div class="caption">sigma=1</div>
+                    </div> 
+                </div>
+                <div class="image-gallery">
+                    <div class="image-container">
+                        <img src="./supplemental/41.png">
+                        <div class="caption">sigma=0</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/42.png">
+                        <div class="caption">sigma=0.2</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/43.png">
+                        <div class="caption">sigma=0.4</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/44.png">
+                        <div class="caption">sigma=0.5</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/45.png">
+                        <div class="caption">sigma=0.6</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/46.png">
+                        <div class="caption">sigma=0.8</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/47.png">
+                        <div class="caption">sigma=1</div>
+                    </div> 
+                </div>
+                <div class="image-gallery">
+                    <div class="image-container">
+                        <img src="./supplemental/21.png">
+                        <div class="caption">sigma=0</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/22.png">
+                        <div class="caption">sigma=0.2</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/23.png">
+                        <div class="caption">sigma=0.4</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/24.png">
+                        <div class="caption">sigma=0.5</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/25.png">
+                        <div class="caption">sigma=0.6</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/26.png">
+                        <div class="caption">sigma=0.8</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/27.png">
+                        <div class="caption">sigma=1</div>
+                    </div> 
+                </div>
+                <p>Here is our training loss graph for learning rate 0.0001</p>
+                    <div class="image-container">
+                        <img src="./supplemental/graph1.png">
+                    </div> 
+                <p>Here is our visualization of the denoising after the first epoch.</p>
+                <div class="image-container">
+                    <img src="./supplemental/denoise01.png">
+                </div> 
+                <div class="image-container">
+                    <img src="./supplemental/denoise41.png">
+                </div> 
+                <div class="image-container">
+                    <img src="./supplemental/denoise21.png">
+                </div> 
+                <p>Here is our visualization of the denoising after the fifth epoch.</p>
+                <div class="image-container">
+                    <img src="./supplemental/denoise05.png">
+                </div> 
+                <div class="image-container">
+                    <img src="./supplemental/denoise45.png">
+                </div> 
+                <div class="image-container">
+                    <img src="./supplemental/denoise25.png">
+                </div>
+                <p>The model was trained on sigma=0.5, so we can see how it performs when we try to denoise it for all possible sigma in [0.0, 0.2, 0.4, 0.5, 0.6, 0.8, 1.0]</p>
+                <div class="image-gallery">
+                    <div class="image-container">
+                        <img src="./supplemental/out1.png">
+                        <div class="caption">sigma=0</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/out2.png">
+                        <div class="caption">sigma=0.2</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/out3.png">
+                        <div class="caption">sigma=0.4</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/out4.png">
+                        <div class="caption">sigma=0.5</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/out5.png">
+                        <div class="caption">sigma=0.6</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/out6.png">
+                        <div class="caption">sigma=0.8</div>
+                    </div>
+                    <div class="image-container">
+                        <img src="./supplemental/out7.png">
+                        <div class="caption">sigma=1</div>
+                    </div> 
+                </div>
+            </div>
+            <div class="section">
+                <h2>Part 2: Training A Diffusion Model (Time-Conditioned)</h2>
+                <p>In the last part, we trained a denoiser that acted as a one-step denoiser (but it only was trained for sigma=0.5). We saw that the out of distribution testing didn't do well when sigma was higher than 0.5.
+                   However, if we time condition the UNet, we can effectively denoise any image no matter what the timestep is. 
+                </p>
+                <p> We first need to introduce scalar variable t, representing the timestep. I introduced it in the same way as the project spec. Also if we change the UNet architecture to solve for expected noise, it is the same thing
+                    as solving for the denoised image (through manipulation of equations, but logically it's the same exact problem).
+                 </p>
+                 <p>Once we do that we need to train the UNet. The way it works is that for each forward pass we need to generate random timesteps for all the images in the batch. Using that, we can add noise to our images. 
+                    We pass in the noisy images and timesteps as tensors to our UNet. Below is our loss graph for learning rate of 1e-3 and batch size of 128.
+                 </p>
+
+                 <div class="image-container">
+                    <img src="./supplemental/graph2.png">
+                </div> 
+
+                <p>We can also sample from the trained model at different epochs to see how the results look like while the model is being trained. To sample an image we can iteratively build the image from timestep 300 to timestep 0. 
+                   The results from epoch 5 and epoch 20 are shown below.
+                 </p>
+                    <div class="image-container">
+                        <img src="./supplemental/epoch5.png">
+                        <div class="caption">epoch=5</div>
+                    </div> 
+                    <div class="image-container">
+                        <img src="./supplemental/epoch20.png">
+                        <div class="caption">epoch=20</div>
+                    </div>
+
+            </div>
+            <div class="section">
+                <h2>Part 3: Training A Diffusion Model (Class-Conditioned)</h2>
+                <p>The last part had its limitation in that we can't control what digit we want. We essentially turned pure noise into random numbers. Also the results aren't the best for specific images. We need to implement CFG just like we did in part
+                   A of this project to get better results. I implemented the class conditioning the same way in the project specifiction.
+                </p>
+                <p>Inside each training batch, we change the labels to be one hot encoded for our model to use. Inside the forward pass of the model, we apply the 0.1 dropout meaning that we train our model to generate conditionally and unconditionally.
+                   A training loss curve is presented below.
+                </p>
+                <div class="image-container">
+                    <img src="./supplemental/graph3.png">
+                </div> 
+                <p>Now that our model is trained condotionally and unconditionally, we are able to apply CFG. For our classes we double the vector with the second half just being unconditional vectors.
+                   We repeat the iamges and the timesteps. This allows us to get both the conditional and unconditional noise for each image (allowing us to effectively see what makes each digit that exact digit).
+                   When we do (noise_pred_cond - noise_pred_uncond), we find what characteristics make that number appear. We amplify that characteristic in CFG. The result for epoch 5 and epoch 20 are shown below.
+                </p>
+                <div class="image-container">
+                    <img src="./supplemental/epoch51.png">
+                    <div class="caption">epoch=5 (0-4)</div>
+                </div> 
+                <div class="image-container">
+                    <img src="./supplemental/epoch52.png">
+                    <div class="caption">epoch=5 (5-9)</div>
+                </div> 
+                <div class="image-container">
+                    <img src="./supplemental/epoch201.png">
+                    <div class="caption">epoch=20 (0-4)</div>
+                </div> 
+                <div class="image-container">
+                    <img src="./supplemental/epoch202.png">
+                    <div class="caption">epoch=20 (5-9)</div>
+                </div> 
+            </div>
+        </div>
+</body>
+</html>
